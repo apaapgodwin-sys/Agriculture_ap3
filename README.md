@@ -87,14 +87,18 @@ agriculture_ap3/
 ├── login.php                    # Secure authentication with demo account fills
 ├── logout.php                   # Session termination
 ├── dashboard.php                # Summary cards, Chart.js graphs, quick operations
+├── app.php                      # Field User App (Crop Guide, Yield Calculator, Maturity Tracker)
+├── profile.php                  # User Account & Profile Settings Interface
 ├── farmers.php                  # Farmer registry CRUD, profile view modal
-├── farms.php                    # Farm parcels CRUD, soil & irrigation classification
+├── farms.php                    # Farm parcels CRUD, soft-delete & trash restore
 ├── crops.php                    # Master crops catalog CRUD, growth cycles
 ├── plantings.php                # Planting cycles CRUD, auto-calculated expected dates
 ├── harvests.php                 # Harvest transactions, market pricing, 3NF controlled remarks
 ├── reports.php                  # Multi-tab reporting, date filters, CSV export, print
+├── logs.php                     # Activity & Audit Logs (Deletions, Creations, Sign-ins, Timestamps)
 ├── users.php                    # Admin User Management & RBAC roles
 ├── setup.php                    # Supabase health diagnostic & sync tool
+├── manifest.json                # PWA Web App manifest for installable mobile/desktop app
 ├── config/
 │   ├── config.php               # Environment loader, CSRF, flash messages, formatters
 │   └── database.php             # Unified Supabase REST API & Local SQLite client
@@ -123,7 +127,7 @@ git init
 git add .
 git commit -m "Complete Agriculture Information System (AgriTrack) for AP3 Midterm"
 git branch -M main
-git remote add origin https://github.com/apaapgodwin-sys/Agriculture_ap3
+git remote add origin https://github.com/apaapgodwin-sys/Agriculture_ap3.git
 git push -u origin main
 ```
 

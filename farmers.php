@@ -40,9 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             Database::update('farmer', 'farmer_id', $id, $data);
+            log_activity('UPDATE', 'FARMER', "Updated details for farmer '{$firstName} {$lastName}' (#{$id}).", $id, $data);
             flash('success', "Farmer {$firstName} {$lastName} updated successfully.");
         } else {
-            Database::insert('farmer', $data);
+            $res = Database::insert('farmer', $data);
+            $newId = (int)($res['id'] ?? $res['farmer_id'] ?? 0);
+            log_activity('CREATE', 'FARMER', "Registered new farmer '{$firstName} {$lastName}' in {$address}.", $newId, $data);
             flash('success', "Farmer {$firstName} {$lastName} registered successfully.");
         }
         redirect('farmers.php');
@@ -68,7 +71,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('farmers.php');
         }
 
+        $fRow = Database::query('farmer', 'first_name, last_name', ['farmer_id' => $id])[0] ?? [];
+        $fName = trim(($fRow['first_name'] ?? '') . ' ' . ($fRow['last_name'] ?? ''));
+
         Database::delete('farmer', 'farmer_id', $id);
+        log_activity('DELETE', 'FARMER', "Deleted farmer record #{$id}" . ($fName ? " ('{$fName}')" : '') . ".", $id);
         flash('success', 'Farmer record deleted successfully.');
         redirect('farmers.php');
     }

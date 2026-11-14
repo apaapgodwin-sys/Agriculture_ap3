@@ -54,6 +54,7 @@ function attempt_login(string $identifier, string $password): bool {
         $user = $users[0];
         if (password_verify($password, $user['password_hash'])) {
             if (($user['status'] ?? 'active') !== 'active') {
+                log_activity('FAILED_LOGIN', 'AUTH', "Attempted sign-in to deactivated account '{$user['username']}'.", (int)$user['user_id']);
                 flash('error', 'Your account has been deactivated. Please contact an administrator.');
                 return false;
             }
@@ -61,7 +62,7 @@ function attempt_login(string $identifier, string $password): bool {
             if (session_status() === PHP_SESSION_ACTIVE) {
                 @session_regenerate_id(true);
             }
-            $_SESSION['user'] = [
+            $sessionData = [
                 'user_id' => (int)$user['user_id'],
                 'username' => $user['username'],
                 'email' => $user['email'],
@@ -69,14 +70,24 @@ function attempt_login(string $identifier, string $password): bool {
                 'role' => $user['role'],
                 'logged_in_at' => time()
             ];
+            $_SESSION['user'] = $sessionData;
+
+            // Log successful sign in
+            log_activity('LOGIN', 'AUTH', "User '{$user['username']}' ({$user['full_name']}) signed in as " . strtoupper($user['role']) . ".", (int)$user['user_id'], null, $sessionData);
             return true;
         }
     }
 
+    // Log failed sign in attempt
+    log_activity('FAILED_LOGIN', 'AUTH', "Failed sign-in attempt with identifier '{$identifier}'.");
     return false;
 }
 
 function logout(): void {
+    if (!empty($_SESSION['user'])) {
+        $u = $_SESSION['user'];
+        log_activity('LOGOUT', 'AUTH', "User '{$u['username']}' signed out of AgriTrack.", (int)($u['user_id'] ?? 0));
+    }
     $_SESSION = [];
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();

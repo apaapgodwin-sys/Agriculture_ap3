@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $data['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
             }
             Database::update('users', 'user_id', $id, $data);
+            log_activity('UPDATE', 'USER', "Updated user account '{$username}' (#{$id}, Role: " . strtoupper($role) . ", Status: " . ucfirst($status) . ").", $id);
             flash('success', "User '{$username}' updated successfully.");
         } else {
             if (strlen($password) < 6) {
@@ -65,7 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 redirect('users.php');
             }
             $data['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
-            Database::insert('users', $data);
+            $res = Database::insert('users', $data);
+            $newId = (int)($res['id'] ?? $res['user_id'] ?? 0);
+            log_activity('CREATE', 'USER', "Created new user account '{$username}' ({$fullName}, Role: " . strtoupper($role) . ").", $newId);
             flash('success', "User '{$username}' created successfully.");
         }
         redirect('users.php');
@@ -84,7 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('users.php');
         }
 
+        $uRow = Database::query('users', 'username, full_name', ['user_id' => $id])[0] ?? [];
+        $uName = $uRow['username'] ?? "User #{$id}";
+
         Database::delete('users', 'user_id', $id);
+        log_activity('DELETE', 'USER', "Deleted user account '{$uName}' (#{$id}).", $id);
         flash('success', 'User account deleted successfully.');
         redirect('users.php');
     }
@@ -125,10 +132,21 @@ require_once __DIR__ . '/includes/header.php';
             </thead>
             <tbody>
                 <?php foreach ($usersList as $u): ?>
+                    <?php
+                        $uInit = strtoupper(substr($u['full_name'] ?: $u['username'], 0, 1));
+                    ?>
                     <tr>
                         <td class="fw-bold text-secondary">#<?= (int)$u['user_id'] ?></td>
                         <td>
-                            <div class="fw-bold text-dark"><?= h($u['full_name']) ?></div>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="sidebar-avatar" style="width: 32px; height: 32px; font-size: 0.78rem;">
+                                    <?= h($uInit) ?>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark"><?= h($u['full_name']) ?></div>
+                                    <small class="text-muted d-block">@<?= h($u['username']) ?></small>
+                                </div>
+                            </div>
                         </td>
                         <td><code><?= h($u['username']) ?></code></td>
                         <td><?= h($u['email']) ?></td>

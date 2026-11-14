@@ -66,6 +66,9 @@ $recentHarvests = Database::rawQuery("
     LIMIT 6
 ");
 
+// Recent System Activity Logs
+$recentLogs = Database::rawQuery("SELECT * FROM activity_logs ORDER BY log_id DESC LIMIT 6");
+
 // Harvest production by Crop for Bar Chart
 $cropHarvestData = Database::rawQuery("
     SELECT c.crop_name, SUM(h.quantity_kg) as total_kg
@@ -174,6 +177,7 @@ foreach ($cropHarvestData as $ch) {
             <span class="text-muted small ms-2">Easily create new transactions or view agricultural records.</span>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="app.php" class="btn btn-sm btn-success"><i class="bi bi-phone-fill me-1"></i> Field User App</a>
             <a href="farmers.php?action=new" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-circle me-1"></i> New Farmer</a>
             <a href="farms.php?action=new" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle me-1"></i> New Farm</a>
             <a href="plantings.php?action=new" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-circle me-1"></i> Log Planting</a>
@@ -295,6 +299,84 @@ foreach ($cropHarvestData as $ch) {
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- System Audit & Activity Trail Row -->
+<div class="card-panel mb-4">
+    <div class="card-panel-header">
+        <h2 class="card-panel-title"><i class="bi bi-clock-history text-success me-2"></i>Live System Activity & Audit Trail</h2>
+        <a href="logs.php" class="btn btn-sm btn-outline-success">View All Logs (<?= $totalPlantings + $totalHarvests ?>+) &rarr;</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-custom align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 150px;">When</th>
+                    <th style="width: 120px;">Action</th>
+                    <th style="width: 100px;">Module</th>
+                    <th style="width: 130px;">User</th>
+                    <th>What Happened</th>
+                    <th style="width: 90px;">Ref ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($recentLogs)): ?>
+                    <tr><td colspan="6" class="text-center text-muted py-4">No activity logged yet. Operations will appear here live.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($recentLogs as $l): ?>
+                        <?php
+                            $act = $l['action'];
+                            $bClass = match($act) {
+                                'CREATE'      => 'bg-success text-white',
+                                'UPDATE'      => 'bg-primary text-white',
+                                'DELETE'      => 'bg-danger text-white',
+                                'SOFT_DELETE' => 'bg-warning text-dark',
+                                'RESTORE'     => 'bg-info text-white',
+                                'LOGIN'       => 'bg-success-subtle text-success border border-success-subtle',
+                                'LOGOUT'      => 'bg-secondary text-white',
+                                default       => 'bg-secondary text-white'
+                            };
+                            $uInit = strtoupper(substr($l['username'] ?? 'U', 0, 1));
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="fw-semibold text-dark small"><?= time_ago($l['created_at']) ?></div>
+                                <small class="text-muted" style="font-size: 0.72rem;"><?= date('M j, g:i A', strtotime($l['created_at'])) ?></small>
+                            </td>
+                            <td>
+                                <span class="badge <?= $bClass ?> px-2 py-1" style="font-size: 0.72rem;">
+                                    <?= h($act) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary-subtle text-secondary border font-monospace" style="font-size: 0.72rem;">
+                                    <?= h($l['module']) ?>
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-1">
+                                    <div class="sidebar-avatar" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                                        <?= h($uInit) ?>
+                                    </div>
+                                    <span class="small fw-semibold text-dark">@<?= h($l['username']) ?></span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-dark small"><?= h($l['description']) ?></span>
+                            </td>
+                            <td>
+                                <?php if (!empty($l['record_id'])): ?>
+                                    <span class="badge bg-light text-dark border">#<?= (int)$l['record_id'] ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 

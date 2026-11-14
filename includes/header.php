@@ -19,6 +19,11 @@ $isSupabase = Database::isSupabaseReady();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- Custom Styles -->
     <link rel="stylesheet" href="assets/css/style.css">
+    <!-- PWA Web App Manifest & Mobile Capability -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#15803d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <!-- Prevent dark-mode flash: apply saved theme before first paint -->
@@ -70,10 +75,25 @@ $isSupabase = Database::isSupabaseReady();
                 <span>Harvest Records</span>
             </a>
 
+            <div class="sidebar-heading mt-2">Field & User App</div>
+            <a href="app.php" class="nav-item-link <?= $activePage === 'app' ? 'active' : '' ?>">
+                <i class="bi bi-phone-fill text-success"></i>
+                <span>Field User App</span>
+                <span class="badge bg-success ms-auto" style="font-size: 0.65rem;">NEW</span>
+            </a>
+            <a href="profile.php" class="nav-item-link <?= $activePage === 'profile' ? 'active' : '' ?>">
+                <i class="bi bi-person-gear"></i>
+                <span>User Account & UI</span>
+            </a>
+
             <div class="sidebar-heading mt-2">Analytics & Management</div>
             <a href="reports.php" class="nav-item-link <?= $activePage === 'reports' ? 'active' : '' ?>">
                 <i class="bi bi-file-earmark-bar-graph-fill"></i>
                 <span>Reports & Valuation</span>
+            </a>
+            <a href="logs.php" class="nav-item-link <?= $activePage === 'logs' ? 'active' : '' ?>">
+                <i class="bi bi-clock-history"></i>
+                <span>Activity & Audit Logs</span>
             </a>
 
             <?php if (is_admin()): ?>
@@ -100,20 +120,20 @@ $isSupabase = Database::isSupabaseReady();
                 foreach ($nameParts as $part) { $initials .= strtoupper($part[0]); }
                 $initials   = substr($initials, 0, 2) ?: 'U';
             ?>
-            <!-- Profile row -->
-            <div class="d-flex align-items-center gap-2 mb-2">
+            <!-- Clickable Profile Row -->
+            <a href="profile.php" class="d-flex align-items-center gap-2 mb-2 text-decoration-none user-footer-link p-1 rounded" title="View & Edit My Profile">
                 <!-- Avatar circle with gradient -->
                 <div class="sidebar-avatar" title="<?= h($fullName) ?>">
                     <?= h($initials) ?>
                 </div>
                 <div class="text-truncate flex-grow-1" style="min-width:0;">
-                    <div class="fw-semibold text-white" style="font-size:0.88rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= h($fullName) ?></div>
+                    <div class="fw-semibold text-white user-name-link" style="font-size:0.88rem; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= h($fullName) ?></div>
                     <div style="font-size: 0.69rem; color: #94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?= h($email) ?></div>
                 </div>
                 <span class="user-badge-role <?= is_admin() ? 'bg-danger text-white' : 'bg-success text-white' ?>" style="flex-shrink:0;">
                     <?= h($role) ?>
                 </span>
-            </div>
+            </a>
             <a href="logout.php" class="btn btn-sm btn-outline-light w-100">
                 <i class="bi bi-box-arrow-right me-1"></i> Sign Out
             </a>
@@ -135,6 +155,12 @@ $isSupabase = Database::isSupabaseReady();
             </div>
 
             <div class="d-flex align-items-center gap-2">
+                <a href="app.php" class="btn btn-sm btn-outline-success d-none d-md-inline-flex align-items-center gap-1 <?= $activePage === 'app' ? 'active' : '' ?>" title="Open Field User App">
+                    <i class="bi bi-phone-fill"></i> User App
+                </a>
+                <a href="profile.php" class="btn btn-sm btn-outline-secondary d-none d-sm-inline-flex align-items-center gap-1 <?= $activePage === 'profile' ? 'active' : '' ?>" title="User Profile & Settings">
+                    <i class="bi bi-person-circle"></i> Profile
+                </a>
                 <?php if ($isSupabase): ?>
                     <span class="status-indicator-pill status-online" title="Direct connection to Supabase PostgreSQL active">
                         <span class="pulse-dot"></span> Supabase Connected

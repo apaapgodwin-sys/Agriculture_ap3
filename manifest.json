@@ -1,0 +1,22 @@
+{
+  "name": "AgriTrack Agriculture Field App",
+  "short_name": "AgriTrack App",
+  "description": "Cebu Technological University - Agriculture Information System & Field Assistant",
+  "start_url": "app.php",
+  "display": "standalone",
+  "background_color": "#0f2316",
+  "theme_color": "#15803d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

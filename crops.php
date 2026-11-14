@@ -45,9 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             Database::update('crop', 'crop_id', $id, $data);
+            log_activity('UPDATE', 'CROP', "Updated crop '{$cropName}' (#{$id}).", $id, $data);
             flash('success', "Crop '{$cropName}' updated successfully.");
         } else {
-            Database::insert('crop', $data);
+            $res = Database::insert('crop', $data);
+            $newId = (int)($res['id'] ?? $res['crop_id'] ?? 0);
+            log_activity('CREATE', 'CROP', "Added new crop '{$cropName}' (" . ($variety ?: 'Standard') . ") to master catalog.", $newId, $data);
             flash('success', "Crop '{$cropName}' added to master catalog.");
         }
         redirect('crops.php');
@@ -73,7 +76,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('crops.php');
         }
 
+        $cRow = Database::query('crop', 'crop_name, variety', ['crop_id' => $id])[0] ?? [];
+        $cName = $cRow['crop_name'] ?? "Crop #{$id}";
+
         Database::delete('crop', 'crop_id', $id);
+        log_activity('DELETE', 'CROP', "Deleted crop '{$cName}' (#{$id}) from master catalog.", $id);
         flash('success', 'Crop record deleted successfully.');
         redirect('crops.php');
     }

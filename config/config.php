@@ -104,3 +104,50 @@ function format_date(?string $date): string {
 // Include database & auth handlers
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/../includes/auth.php';
+
+/**
+ * System Activity / Audit Logger
+ * Records what was created, updated, deleted, who logged in, and when.
+ */
+function log_activity(string $action, string $module, string $description, ?int $recordId = null, ?array $details = null, ?array $userContext = null): bool {
+    try {
+        $user = $userContext ?? (function_exists('current_user') ? current_user() : null);
+        $userId = $user['user_id'] ?? null;
+        $username = $user['username'] ?? 'system';
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+        $data = [
+            'user_id'     => $userId ? (int)$userId : null,
+            'username'    => (string)$username,
+            'action'      => strtoupper(trim($action)),
+            'module'      => strtoupper(trim($module)),
+            'record_id'   => $recordId ? (int)$recordId : null,
+            'description' => trim($description),
+            'details'     => $details !== null ? json_encode($details, JSON_UNESCAPED_UNICODE) : null,
+            'ip_address'  => substr((string)$ip, 0, 45),
+            'created_at'  => date('Y-m-d H:i:s')
+        ];
+
+        Database::insert('activity_logs', $data);
+        return true;
+    } catch (Throwable $e) {
+        error_log("Failed to write activity log: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Human-readable relative time helper
+ */
+function time_ago(?string $datetime): string {
+    if (!$datetime) return '—';
+    $time = strtotime($datetime);
+    if (!$time) return '—';
+    $diff = time() - $time;
+    if ($diff < 5) return 'just now';
+    if ($diff < 60) return $diff . 's ago';
+    if ($diff < 3600) return (int)floor($diff / 60) . 'm ago';
+    if ($diff < 86400) return (int)floor($diff / 3600) . 'h ago';
+    if ($diff < 604800) return (int)floor($diff / 86400) . 'd ago';
+    return date('M j, Y g:i A', $time);
+}

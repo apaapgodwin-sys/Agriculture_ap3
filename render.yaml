@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: agriculture-ap3
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false

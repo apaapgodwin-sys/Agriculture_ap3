@@ -31,6 +31,29 @@ class Database {
         ]);
         self::$sqlitePdo->exec("PRAGMA foreign_keys = ON;");
 
+        // Ensure activity_logs table exists
+        self::$sqlitePdo->exec("
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NULL,
+                username TEXT NOT NULL,
+                action TEXT NOT NULL,
+                module TEXT NOT NULL,
+                record_id INTEGER NULL,
+                description TEXT NOT NULL,
+                details TEXT NULL,
+                ip_address TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+        ");
+
+        // Ensure soft-delete column exists on farm table
+        try {
+            self::$sqlitePdo->exec("ALTER TABLE farm ADD COLUMN deleted_at TEXT NULL;");
+        } catch (Throwable) {
+            // Column already exists, safe to ignore
+        }
+
         if ($needsInit) {
             self::initLocalDatabase(self::$sqlitePdo);
         }
@@ -413,6 +436,19 @@ class Database {
             remarks_note TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NULL,
+            username TEXT NOT NULL,
+            action TEXT NOT NULL,
+            module TEXT NOT NULL,
+            record_id INTEGER NULL,
+            description TEXT NOT NULL,
+            details TEXT NULL,
+            ip_address TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
 SQL;
         $pdo->exec($schemaSql);

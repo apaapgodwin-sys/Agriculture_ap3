@@ -69,9 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             Database::update('harvest', 'harvest_id', $id, $data);
+            log_activity('UPDATE', 'HARVEST', "Updated harvest transaction #{$id} ({$quantityKg} kg at ₱{$sellingPricePerKg}/kg).", $id, $data);
             flash('success', "Harvest record #{$id} updated successfully.");
         } else {
-            Database::insert('harvest', $data);
+            $res = Database::insert('harvest', $data);
+            $newId = (int)($res['id'] ?? $res['harvest_id'] ?? 0);
+            $val = $quantityKg * $sellingPricePerKg;
+            log_activity('CREATE', 'HARVEST', "Recorded harvest #{$newId} of {$quantityKg} kg at ₱{$sellingPricePerKg}/kg (Valuation: ₱" . number_format($val, 2) . ") for planting #{$plantingId}.", $newId, $data);
             // Auto-update linked planting status to Harvested (status_id = 2) if it was Growing
             Database::update('planting', 'planting_id', $plantingId, ['status_id' => 2]);
             flash('success', "Harvest transaction recorded successfully! Planting cycle #{$plantingId} marked as Harvested.");
@@ -92,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         Database::delete('harvest', 'harvest_id', $id);
+        log_activity('DELETE', 'HARVEST', "Deleted harvest record #{$id}.", $id);
         flash('success', 'Harvest record deleted successfully.');
         redirect('harvests.php');
     }

@@ -57,9 +57,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             Database::update('planting', 'planting_id', $id, $data);
+            log_activity('UPDATE', 'PLANTING', "Updated planting cycle #{$id} (Farm #{$farmId}, Crop #{$cropId}).", $id, $data);
             flash('success', "Planting record #{$id} updated successfully.");
         } else {
-            Database::insert('planting', $data);
+            $res = Database::insert('planting', $data);
+            $newId = (int)($res['id'] ?? $res['planting_id'] ?? 0);
+            log_activity('CREATE', 'PLANTING', "Logged new planting cycle #{$newId} ({$areaPlanted} ha) on farm #{$farmId}.", $newId, $data);
             flash('success', "New planting cycle logged successfully.");
         }
         redirect('plantings.php');
@@ -86,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         Database::delete('planting', 'planting_id', $id);
+        log_activity('DELETE', 'PLANTING', "Deleted planting cycle record #{$id}.", $id);
         flash('success', 'Planting record deleted successfully.');
         redirect('plantings.php');
     }

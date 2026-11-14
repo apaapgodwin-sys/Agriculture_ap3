@@ -95,6 +95,34 @@ The system implements rigorous relational database normalization (progressing fr
 - **Export to CSV:** Direct RFC-4180 compliant CSV spreadsheet generation for external evaluation.
 - **Print Stylesheet:** Custom CSS `@media print` rules generating printer-friendly documents hiding web navbars and buttons.
 
+### 3.5 Field User App & User Interface (UI / PWA)
+- **Field User App (`app.php`):**
+  - **Crop Catalog & Guide:** Visual explorer for all 10 master crops with growing duration, recommended season, and classification tags.
+  - **Yield & Profit Calculator:** Interactive client-side estimation tool computing projected yield (kg), gross sales (₱), and target harvest date based on farm acreage and market pricing.
+  - **Active Plantings Maturity Countdown:** Live field tracker with real-time countdown badges ("Harvest in X days", "Ready for Harvest!", or "Overdue") and 1-click "Log Harvest Now" shortcut.
+  - **Quick Field Logger:** Streamlined mobile-friendly data entry for logging field plantings and harvests with automatic status transition.
+  - **Cebu Agro-Climatic & Soil Advisory:** Seasonal weather guidance and 3NF soil/irrigation compatibility recommendations.
+- **User Account & Settings Interface (`profile.php`):**
+  - Interactive profile management with initials avatar badge, role display, and active database connection indicator.
+  - Profile update form (Full Name, Username, Email) with CSRF and duplicate prevention.
+  - Cryptographic password modification form with real-time strength meter and current password verification.
+  - Role-based authorization matrix showing permissions for Administrator vs Staff.
+  - System activity and session audit summary.
+- **Responsive Dark/Light Mode Theme:** Full CSS variables architecture with 1-click persistent toggle and dark-mode table styling.
+- **Progressive Web App (PWA):** `manifest.json` configuration for standalone app installation on mobile and desktop devices.
+
+### 3.6 System Activity & Audit Trail (`logs.php`)
+- **Comprehensive Audit Tracking:**
+  - **What was deleted:** Records all deletions (permanent purges and soft deletes to trash) with record IDs, entity names, and user attribution.
+  - **Who logged in:** Captures successful sign-in sessions, user roles, IP addresses, failed sign-in attempts, and logouts.
+  - **What was created & updated:** Logs newly created farmers, farm parcels, crops, plantings, and harvest records along with their primary keys and attributes.
+  - **When actions occurred:** Tracks exact ISO timestamps and provides human-readable relative time badges (`just now`, `5m ago`, `2h ago`).
+- **Audit Management Interface (`logs.php`):**
+  - Metric summary cards (Total Logs, Creations, Updates, Deletions, Sign-ins).
+  - Multi-parameter filtering by Action (`CREATE`, `UPDATE`, `DELETE`, `SOFT_DELETE`, `RESTORE`, `LOGIN`, `LOGOUT`), Module (`AUTH`, `FARMER`, `FARM`, `CROP`, `PLANTING`, `HARVEST`, `USER`), User, and Date Range.
+  - One-click RFC-4180 compliant CSV Export.
+  - Admin-only log purge with audit trail record.
+
 ---
 
 ## 4. Entity-Relationship Diagram (ERD)
@@ -210,6 +238,20 @@ erDiagram
         timestamptz updated_at
     }
 
+    activity_logs {
+        int log_id PK
+        int user_id FK
+        string username
+        string action
+        string module
+        int record_id
+        string description
+        string details
+        string ip_address
+        timestamptz created_at
+    }
+
+    users ||--o{ activity_logs : "initiates (1:M)"
     farmer ||--o{ farm : "owns (1:M)"
     soil_types ||--o{ farm : "classifies (1:M)"
     irrigation_types ||--o{ farm : "supplies (1:M)"

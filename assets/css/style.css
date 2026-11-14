@@ -789,6 +789,75 @@ body {
     border-radius: 10px;
 }
 
+/* ── User Profile & App Styles ───────────────────────────────── */
+.profile-avatar-large {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(255,255,255,0.25);
+    box-shadow: 0 4px 18px rgba(21,128,61,0.45);
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.user-footer-link {
+    transition: background 0.2s ease, transform 0.15s ease;
+    cursor: pointer;
+}
+
+.user-footer-link:hover {
+    background-color: rgba(255,255,255,0.08) !important;
+    transform: translateY(-1px);
+}
+
+.user-name-link {
+    transition: color 0.15s ease;
+}
+
+.user-footer-link:hover .user-name-link {
+    color: #4ade80 !important;
+}
+
+.hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+[data-theme="dark"] .hover-lift:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+/* Nav Pills Styling */
+.nav-pills .nav-link {
+    color: var(--text-muted);
+    background-color: transparent;
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.nav-pills .nav-link:hover {
+    color: var(--primary-light);
+    background-color: rgba(34,197,94,0.08);
+}
+
+.nav-pills .nav-link.active {
+    background: linear-gradient(135deg, #22c55e 0%, #15803d 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(21,128,61,0.3);
+}
+
 /* ── Responsive ───────────────────────────────────────────────── */
 /* Responsive */
 @media (max-width: 991.98px) {

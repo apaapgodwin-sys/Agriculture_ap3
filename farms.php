@@ -48,9 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($id > 0) {
             Database::update('farm', 'farm_id', $id, $data);
+            log_activity('UPDATE', 'FARM', "Updated farm '{$farmName}' (#{$id}).", $id, $data);
             flash('success', "Farm '{$farmName}' updated successfully.");
         } else {
-            Database::insert('farm', $data);
+            $res = Database::insert('farm', $data);
+            $newId = (int)($res['id'] ?? $res['farm_id'] ?? 0);
+            log_activity('CREATE', 'FARM', "Registered new farm '{$farmName}' ({$areaHectares} ha) in {$location}.", $newId, $data);
             flash('success', "Farm '{$farmName}' registered successfully.");
         }
         redirect('farms.php');
@@ -71,10 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('farms.php');
         }
 
+        $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
+        $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
+
         Database::rawQuery(
             "UPDATE farm SET deleted_at = datetime('now') WHERE farm_id = :id",
             [':id' => $id]
         );
+        log_activity('SOFT_DELETE', 'FARM', "Moved farm '{$fName}' (#{$id}) to Recently Deleted trash.", $id);
         flash('success', 'Farm moved to Recently Deleted. You can restore it within 30 days.');
         redirect('farms.php?tab=deleted');
     }
@@ -85,10 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['farm_id'] ?? 0);
         if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php'); }
 
+        $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
+        $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
+
         Database::rawQuery(
             "UPDATE farm SET deleted_at = NULL WHERE farm_id = :id",
             [':id' => $id]
         );
+        log_activity('RESTORE', 'FARM', "Restored farm '{$fName}' (#{$id}) from trash.", $id);
         flash('success', 'Farm restored successfully.');
         redirect('farms.php');
     }
@@ -99,7 +110,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['farm_id'] ?? 0);
         if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php'); }
 
+        $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
+        $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
+
         Database::delete('farm', 'farm_id', $id);
+        log_activity('DELETE', 'FARM', "Permanently deleted farm '{$fName}' (#{$id}) from database.", $id);
         flash('success', 'Farm permanently deleted.');
         redirect('farms.php?tab=deleted');
     }
