@@ -65,57 +65,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['farm_id'] ?? 0);
         if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php'); }
 
-        // Block if linked plantings exist
-        $cnt = (int)(Database::rawQuery(
-            "SELECT COUNT(*) as cnt FROM planting WHERE farm_id = :id", [':id' => $id]
-        )[0]['cnt'] ?? 0);
-        if ($cnt > 0) {
-            flash('error', "Cannot delete this farm: it has {$cnt} planting record(s) linked. Remove or reassign them first.");
-            redirect('farms.php');
-        }
-
         $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
         $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
 
+        // Soft delete: set deleted_at timestamp (both Supabase & SQLite)
+        $now = date('Y-m-d H:i:s');
+        Database::update('farm', 'farm_id', $id, ['deleted_at' => $now]);
         Database::rawQuery(
-            "UPDATE farm SET deleted_at = datetime('now') WHERE farm_id = :id",
-            [':id' => $id]
+            "UPDATE farm SET deleted_at = :ts WHERE farm_id = :id",
+            [':ts' => $now, ':id' => $id]
         );
+
         log_activity('SOFT_DELETE', 'FARM', "Moved farm '{$fName}' (#{$id}) to Recently Deleted trash.", $id);
-        flash('success', 'Farm moved to Recently Deleted. You can restore it within 30 days.');
+        flash('success', "Farm '{$fName}' moved to Recently Deleted. You can restore it anytime from the Recently Deleted tab.");
         redirect('farms.php?tab=deleted');
     }
 
     // ── Restore ──────────────────────────────────────────────────
     if ($action === 'restore') {
-        if (!is_admin()) { flash('error', 'Permission denied.'); redirect('farms.php'); }
+        if (!is_admin()) { flash('error', 'Permission denied.'); redirect('farms.php?tab=deleted'); }
         $id = (int)($_POST['farm_id'] ?? 0);
-        if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php'); }
+        if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php?tab=deleted'); }
 
         $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
         $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
 
+        // Restore: clear deleted_at timestamp (both Supabase & SQLite)
+        Database::update('farm', 'farm_id', $id, ['deleted_at' => null]);
         Database::rawQuery(
             "UPDATE farm SET deleted_at = NULL WHERE farm_id = :id",
             [':id' => $id]
         );
+
         log_activity('RESTORE', 'FARM', "Restored farm '{$fName}' (#{$id}) from trash.", $id);
-        flash('success', 'Farm restored successfully.');
+        flash('success', "Farm '{$fName}' has been restored to Active Farms.");
         redirect('farms.php');
     }
 
     // ── Permanent Delete ─────────────────────────────────────────
     if ($action === 'permanent_delete') {
-        if (!is_admin()) { flash('error', 'Permission denied.'); redirect('farms.php'); }
+        if (!is_admin()) { flash('error', 'Permission denied.'); redirect('farms.php?tab=deleted'); }
         $id = (int)($_POST['farm_id'] ?? 0);
-        if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php'); }
+        if ($id <= 0) { flash('error', 'Invalid farm record.'); redirect('farms.php?tab=deleted'); }
+
+        // Block if linked plantings exist - foreign key protection
+        $cnt = (int)(Database::rawQuery(
+            "SELECT COUNT(*) as cnt FROM planting WHERE farm_id = :id", [':id' => $id]
+        )[0]['cnt'] ?? 0);
+        if ($cnt > 0) {
+            flash('error', "Cannot permanently delete this farm: it has {$cnt} historical planting record(s) linked to it. You must delete or reassign those planting records first.");
+            redirect('farms.php?tab=deleted');
+        }
 
         $farmRow = Database::query('farm', 'farm_name', ['farm_id' => $id])[0] ?? [];
         $fName = $farmRow['farm_name'] ?? "Farm #{$id}";
 
         Database::delete('farm', 'farm_id', $id);
         log_activity('DELETE', 'FARM', "Permanently deleted farm '{$fName}' (#{$id}) from database.", $id);
-        flash('success', 'Farm permanently deleted.');
+        flash('success', "Farm '{$fName}' was permanently deleted.");
         redirect('farms.php?tab=deleted');
     }
 }
@@ -149,18 +156,19 @@ if ($filterIrrigation > 0) {
     $params[':irrigation'] = $filterIrrigation;
 }
 
-$countSql  = "SELECT COUNT(*) as total FROM farm fm JOIN farmer f ON f.farmer_id = fm.farmer_id WHERE {$sqlWhere}";
+$countSql  = "SELECT COUNT(*) as total FROM farm fm LEFT JOIN farmer f ON f.farmer_id = fm.farmer_id WHERE {$sqlWhere}";
 $totalRows = (int)(Database::rawQuery($countSql, $params)[0]['total'] ?? 0);
 $totalPages= max(1, (int)ceil($totalRows / $perPage));
 
 $selectSql = "
     SELECT fm.*, f.first_name, f.last_name, f.contact_number as farmer_phone,
-           st.soil_type_name, it.irrigation_type_name,
+           COALESCE(st.soil_type_name, 'Unknown') as soil_type_name,
+           COALESCE(it.irrigation_type_name, 'Unknown') as irrigation_type_name,
            (SELECT COUNT(*) FROM planting p WHERE p.farm_id = fm.farm_id) as planting_count
     FROM farm fm
-    JOIN farmer f  ON f.farmer_id  = fm.farmer_id
-    JOIN soil_types st ON st.soil_type_id = fm.soil_type_id
-    JOIN irrigation_types it ON it.irrigation_type_id = fm.irrigation_type_id
+    LEFT JOIN farmer f  ON f.farmer_id  = fm.farmer_id
+    LEFT JOIN soil_types st ON st.soil_type_id = fm.soil_type_id
+    LEFT JOIN irrigation_types it ON it.irrigation_type_id = fm.irrigation_type_id
     WHERE {$sqlWhere}
     ORDER BY fm.farm_id ASC
     LIMIT {$perPage} OFFSET {$offset}
@@ -170,11 +178,12 @@ $farmsList = Database::rawQuery($selectSql, $params);
 // ─── Deleted Farms ────────────────────────────────────────────────
 $deletedFarms = Database::rawQuery("
     SELECT fm.*, f.first_name, f.last_name,
-           st.soil_type_name, it.irrigation_type_name
+           COALESCE(st.soil_type_name, 'Unknown') as soil_type_name,
+           COALESCE(it.irrigation_type_name, 'Unknown') as irrigation_type_name
     FROM farm fm
-    JOIN farmer f  ON f.farmer_id  = fm.farmer_id
-    JOIN soil_types st ON st.soil_type_id = fm.soil_type_id
-    JOIN irrigation_types it ON it.irrigation_type_id = fm.irrigation_type_id
+    LEFT JOIN farmer f  ON f.farmer_id  = fm.farmer_id
+    LEFT JOIN soil_types st ON st.soil_type_id = fm.soil_type_id
+    LEFT JOIN irrigation_types it ON it.irrigation_type_id = fm.irrigation_type_id
     WHERE fm.deleted_at IS NOT NULL
     ORDER BY fm.deleted_at DESC
 ");

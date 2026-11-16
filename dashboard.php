@@ -5,13 +5,12 @@ require_once __DIR__ . '/includes/header.php';
 
 // Fetch dynamic counts & statistics
 $farmers = Database::query('farmer', 'farmer_id');
-$farms = Database::query('farm', 'farm_id');
 $crops = Database::query('crop', 'crop_id');
 $plantings = Database::query('planting', 'planting_id, status_id');
 $harvests = Database::query('harvest', 'harvest_id, quantity_kg, selling_price_per_kg');
 
 $totalFarmers = count($farmers);
-$totalFarms = count($farms);
+$totalFarms = (int)(Database::rawQuery("SELECT COUNT(*) as c FROM farm WHERE deleted_at IS NULL")[0]['c'] ?? 0);
 $totalCrops = count($crops);
 $totalPlantings = count($plantings);
 $totalHarvests = count($harvests);

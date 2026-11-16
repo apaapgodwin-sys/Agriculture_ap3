@@ -100,6 +100,7 @@ $allFarms = Database::rawQuery("
     SELECT fm.farm_id, fm.farm_name, fm.location, f.first_name, f.last_name
     FROM farm fm
     JOIN farmer f ON f.farmer_id = fm.farmer_id
+    WHERE fm.deleted_at IS NULL
     ORDER BY fm.farm_name ASC
 ");
 $allCrops = Database::rawQuery("
