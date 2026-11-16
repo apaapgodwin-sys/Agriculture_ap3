@@ -74,13 +74,6 @@ $isSupabase = Database::isSupabaseReady();
                 <i class="bi bi-basket3-fill"></i>
                 <span>Harvest Records</span>
             </a>
-
-            <div class="sidebar-heading mt-2">Field & User App</div>
-            <a href="app.php" class="nav-item-link <?= $activePage === 'app' ? 'active' : '' ?>">
-                <i class="bi bi-phone-fill text-success"></i>
-                <span>Field User App</span>
-                <span class="badge bg-success ms-auto" style="font-size: 0.65rem;">NEW</span>
-            </a>
             <a href="profile.php" class="nav-item-link <?= $activePage === 'profile' ? 'active' : '' ?>">
                 <i class="bi bi-person-gear"></i>
                 <span>User Account & UI</span>
@@ -155,9 +148,7 @@ $isSupabase = Database::isSupabaseReady();
             </div>
 
             <div class="d-flex align-items-center gap-2">
-                <a href="app.php" class="btn btn-sm btn-outline-success d-none d-md-inline-flex align-items-center gap-1 <?= $activePage === 'app' ? 'active' : '' ?>" title="Open Field User App">
-                    <i class="bi bi-phone-fill"></i> User App
-                </a>
+                
                 <a href="profile.php" class="btn btn-sm btn-outline-secondary d-none d-sm-inline-flex align-items-center gap-1 <?= $activePage === 'profile' ? 'active' : '' ?>" title="User Profile & Settings">
                     <i class="bi bi-person-circle"></i> Profile
                 </a>

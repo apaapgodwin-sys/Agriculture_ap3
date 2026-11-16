@@ -135,9 +135,6 @@ require_once __DIR__ . '/includes/header.php';
         <small class="text-muted">Manage your personal credentials, system authorization, and preferences.</small>
     </div>
     <div class="d-flex gap-2">
-        <a href="app.php" class="btn btn-outline-success">
-            <i class="bi bi-phone-fill me-1"></i> Open Field User App
-        </a>
         <a href="dashboard.php" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
         </a>

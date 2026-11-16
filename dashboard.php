@@ -177,7 +177,6 @@ foreach ($cropHarvestData as $ch) {
             <span class="text-muted small ms-2">Easily create new transactions or view agricultural records.</span>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a href="app.php" class="btn btn-sm btn-success"><i class="bi bi-phone-fill me-1"></i> Field User App</a>
             <a href="farmers.php?action=new" class="btn btn-sm btn-outline-success"><i class="bi bi-plus-circle me-1"></i> New Farmer</a>
             <a href="farms.php?action=new" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle me-1"></i> New Farm</a>
             <a href="plantings.php?action=new" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-circle me-1"></i> Log Planting</a>
