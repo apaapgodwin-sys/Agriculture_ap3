@@ -105,35 +105,22 @@ function format_date(?string $date): string {
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/../includes/auth.php';
 
+// Register OOP Class Autoloader
+spl_autoload_register(function (string $className): void {
+    $classFile = __DIR__ . '/../classes/' . $className . '.php';
+    if (file_exists($classFile)) {
+        require_once $classFile;
+    }
+});
+
 /**
  * System Activity / Audit Logger
  * Records what was created, updated, deleted, who logged in, and when.
+ * Delegates to OOP ActivityLog model.
  */
 function log_activity(string $action, string $module, string $description, ?int $recordId = null, ?array $details = null, ?array $userContext = null): bool {
-    try {
-        $user = $userContext ?? (function_exists('current_user') ? current_user() : null);
-        $userId = $user['user_id'] ?? null;
-        $username = $user['username'] ?? 'system';
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-
-        $data = [
-            'user_id'     => $userId ? (int)$userId : null,
-            'username'    => (string)$username,
-            'action'      => strtoupper(trim($action)),
-            'module'      => strtoupper(trim($module)),
-            'record_id'   => $recordId ? (int)$recordId : null,
-            'description' => trim($description),
-            'details'     => $details !== null ? json_encode($details, JSON_UNESCAPED_UNICODE) : null,
-            'ip_address'  => substr((string)$ip, 0, 45),
-            'created_at'  => date('Y-m-d H:i:s')
-        ];
-
-        Database::insert('activity_logs', $data);
-        return true;
-    } catch (Throwable $e) {
-        error_log("Failed to write activity log: " . $e->getMessage());
-        return false;
-    }
+    $logger = new ActivityLog();
+    return $logger->log($action, $module, $description, $recordId, $details, $userContext);
 }
 
 /**

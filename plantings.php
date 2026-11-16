@@ -4,6 +4,10 @@ $pageTitle = 'Planting Records Management';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$plantingModel = new Planting();
+$farmModel     = new Farm();
+$cropModel     = new Crop();
+
 // Handle POST actions: Save (Create/Update), Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -56,12 +60,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($id > 0) {
-            Database::update('planting', 'planting_id', $id, $data);
+            $plantingModel->update($id, $data);
             log_activity('UPDATE', 'PLANTING', "Updated planting cycle #{$id} (Farm #{$farmId}, Crop #{$cropId}).", $id, $data);
             flash('success', "Planting record #{$id} updated successfully.");
         } else {
-            $res = Database::insert('planting', $data);
-            $newId = (int)($res['id'] ?? $res['planting_id'] ?? 0);
+            $newId = $plantingModel->create($data);
             log_activity('CREATE', 'PLANTING', "Logged new planting cycle #{$newId} ({$areaPlanted} ha) on farm #{$farmId}.", $newId, $data);
             flash('success', "New planting cycle logged successfully.");
         }
@@ -80,91 +83,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('plantings.php');
         }
 
-        // Referential integrity check: check if planting has harvests
-        $linkedHarvests = Database::rawQuery("SELECT COUNT(*) as cnt FROM harvest WHERE planting_id = :id", [':id' => $id]);
-        $harvestCount = (int)($linkedHarvests[0]['cnt'] ?? 0);
-        if ($harvestCount > 0) {
-            flash('error', "Cannot delete planting record #{$id}: it has {$harvestCount} linked harvest transaction(s). Delete the harvest records first.");
+        $delResult = $plantingModel->deletePlanting($id);
+        if (!$delResult['success']) {
+            flash('error', $delResult['message']);
             redirect('plantings.php');
         }
 
-        Database::delete('planting', 'planting_id', $id);
         log_activity('DELETE', 'PLANTING', "Deleted planting cycle record #{$id}.", $id);
-        flash('success', 'Planting record deleted successfully.');
+        flash('success', $delResult['message']);
         redirect('plantings.php');
     }
 }
 
-// Fetch Lookups
-$allFarms = Database::rawQuery("
-    SELECT fm.farm_id, fm.farm_name, fm.location, f.first_name, f.last_name
-    FROM farm fm
-    JOIN farmer f ON f.farmer_id = fm.farmer_id
-    WHERE fm.deleted_at IS NULL
-    ORDER BY fm.farm_name ASC
-");
-$allCrops = Database::rawQuery("
-    SELECT crop_id, crop_name, variety, growing_period_days
-    FROM crop
-    ORDER BY crop_name ASC
-");
-$allStatuses = Database::query('planting_statuses', 'status_id, status_name', [], 'status_id.asc');
+// Fetch Lookups via Models
+$allFarms    = $farmModel->getDropdownList();
+$allCrops    = $cropModel->getDropdownList();
+$allStatuses = $plantingModel->getStatuses();
 
-// Filters & Search & Pagination
-$search = trim((string)($_GET['q'] ?? ''));
+// Filters & Search & Pagination via Planting Model
+$search       = trim((string)($_GET['q'] ?? ''));
 $filterStatus = (int)($_GET['status'] ?? 0);
-$filterFarm = (int)($_GET['farm'] ?? 0);
-$filterCrop = (int)($_GET['crop'] ?? 0);
-$pageNo = max(1, (int)($_GET['p'] ?? 1));
-$perPage = 10;
-$offset = ($pageNo - 1) * $perPage;
+$filterFarm   = (int)($_GET['farm'] ?? 0);
+$filterCrop   = (int)($_GET['crop'] ?? 0);
+$pageNo       = max(1, (int)($_GET['p'] ?? 1));
+$perPage      = 10;
+$offset       = ($pageNo - 1) * $perPage;
 
-$sqlWhere = "1=1";
-$params = [];
-if ($search !== '') {
-    $sqlWhere .= " AND (fm.farm_name LIKE :q OR c.crop_name LIKE :q OR f.first_name LIKE :q OR f.last_name LIKE :q)";
-    $params[':q'] = '%' . $search . '%';
-}
-if ($filterStatus > 0) {
-    $sqlWhere .= " AND p.status_id = :status";
-    $params[':status'] = $filterStatus;
-}
-if ($filterFarm > 0) {
-    $sqlWhere .= " AND p.farm_id = :farm";
-    $params[':farm'] = $filterFarm;
-}
-if ($filterCrop > 0) {
-    $sqlWhere .= " AND p.crop_id = :crop";
-    $params[':crop'] = $filterCrop;
-}
-
-$countSql = "
-    SELECT COUNT(*) as total
-    FROM planting p
-    JOIN farm fm ON fm.farm_id = p.farm_id
-    JOIN farmer f ON f.farmer_id = fm.farmer_id
-    JOIN crop c ON c.crop_id = p.crop_id
-    WHERE {$sqlWhere}
-";
-$totalRows = (int)(Database::rawQuery($countSql, $params)[0]['total'] ?? 0);
-$totalPages = max(1, (int)ceil($totalRows / $perPage));
-
-$selectSql = "
-    SELECT p.*, fm.farm_name, fm.location as farm_location,
-           f.first_name, f.last_name,
-           c.crop_name, c.variety, c.growing_period_days,
-           ps.status_name,
-           (SELECT COUNT(*) FROM harvest h WHERE h.planting_id = p.planting_id) as harvest_count
-    FROM planting p
-    JOIN farm fm ON fm.farm_id = p.farm_id
-    JOIN farmer f ON f.farmer_id = fm.farmer_id
-    JOIN crop c ON c.crop_id = p.crop_id
-    JOIN planting_statuses ps ON ps.status_id = p.status_id
-    WHERE {$sqlWhere}
-    ORDER BY p.planting_id ASC
-    LIMIT {$perPage} OFFSET {$offset}
-";
-$plantingsList = Database::rawQuery($selectSql, $params);
+$totalRows     = $plantingModel->countFiltered($search, $filterStatus, $filterFarm, $filterCrop);
+$totalPages    = max(1, (int)ceil($totalRows / $perPage));
+$plantingsList = $plantingModel->getAll($search, $filterStatus, $filterFarm, $filterCrop, $perPage, $offset);
 
 require_once __DIR__ . '/includes/header.php';
 ?>

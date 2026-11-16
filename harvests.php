@@ -4,6 +4,9 @@ $pageTitle = 'Harvest Records Management';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$harvestModel  = new Harvest();
+$plantingModel = new Planting();
+
 // Handle POST actions: Save (Create/Update), Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -46,12 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // Logical date relationship check: harvest_date >= planting_date
-        $plantingInfo = Database::rawQuery("SELECT planting_date, status_id FROM planting WHERE planting_id = :id", [':id' => $plantingId]);
-        if (empty($plantingInfo)) {
+        $plantingInfo = $plantingModel->find($plantingId);
+        if (!$plantingInfo) {
             flash('error', 'Selected planting record does not exist.');
             redirect('harvests.php');
         }
-        $pDate = $plantingInfo[0]['planting_date'];
+        $pDate = $plantingInfo['planting_date'];
         if ($harvestDate < $pDate) {
             flash('error', "Harvest date ({$harvestDate}) cannot be before the planting date ({$pDate}).");
             redirect('harvests.php');
@@ -68,16 +71,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($id > 0) {
-            Database::update('harvest', 'harvest_id', $id, $data);
+            $harvestModel->update($id, $data);
             log_activity('UPDATE', 'HARVEST', "Updated harvest transaction #{$id} ({$quantityKg} kg at ₱{$sellingPricePerKg}/kg).", $id, $data);
             flash('success', "Harvest record #{$id} updated successfully.");
         } else {
-            $res = Database::insert('harvest', $data);
-            $newId = (int)($res['id'] ?? $res['harvest_id'] ?? 0);
+            $newId = $harvestModel->create($data);
             $val = $quantityKg * $sellingPricePerKg;
             log_activity('CREATE', 'HARVEST', "Recorded harvest #{$newId} of {$quantityKg} kg at ₱{$sellingPricePerKg}/kg (Valuation: ₱" . number_format($val, 2) . ") for planting #{$plantingId}.", $newId, $data);
             // Auto-update linked planting status to Harvested (status_id = 2) if it was Growing
-            Database::update('planting', 'planting_id', $plantingId, ['status_id' => 2]);
+            $plantingModel->update($plantingId, ['status_id' => 2]);
             flash('success', "Harvest transaction recorded successfully! Planting cycle #{$plantingId} marked as Harvested.");
         }
         redirect('harvests.php');
@@ -95,79 +97,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('harvests.php');
         }
 
-        Database::delete('harvest', 'harvest_id', $id);
+        $harvestModel->deleteHarvest($id);
         log_activity('DELETE', 'HARVEST', "Deleted harvest record #{$id}.", $id);
         flash('success', 'Harvest record deleted successfully.');
         redirect('harvests.php');
     }
 }
 
-// Fetch Lookups
-$allPlantings = Database::rawQuery("
-    SELECT p.planting_id, p.planting_date, f.farm_name, c.crop_name
-    FROM planting p
-    JOIN farm f ON f.farm_id = p.farm_id
-    JOIN crop c ON c.crop_id = p.crop_id
-    ORDER BY p.planting_id DESC
-");
-$allGrades = Database::query('harvest_quality_grades', 'quality_grade_id, grade_name', [], 'quality_grade_id.asc');
-$allRemarks = Database::query('harvest_remarks', 'remark_id, remark_description', [], 'remark_id.asc');
+// Fetch Lookups via Models
+$allPlantings = $plantingModel->getEligibleForHarvest();
+$allGrades    = $harvestModel->getQualityGrades();
+$allRemarks   = $harvestModel->getRemarks();
 
-// Filters & Search & Pagination
-$search = trim((string)($_GET['q'] ?? ''));
-$filterGrade = (int)($_GET['grade'] ?? 0);
+// Filters & Search & Pagination via Harvest Model
+$search       = trim((string)($_GET['q'] ?? ''));
+$filterGrade  = (int)($_GET['grade'] ?? 0);
 $filterRemark = (int)($_GET['remark'] ?? 0);
-$pageNo = max(1, (int)($_GET['p'] ?? 1));
-$perPage = 10;
-$offset = ($pageNo - 1) * $perPage;
+$pageNo       = max(1, (int)($_GET['p'] ?? 1));
+$perPage      = 10;
+$offset       = ($pageNo - 1) * $perPage;
 
-$sqlWhere = "1=1";
-$params = [];
-if ($search !== '') {
-    $sqlWhere .= " AND (f.farm_name LIKE :q OR c.crop_name LIKE :q OR fm.first_name LIKE :q OR fm.last_name LIKE :q OR h.remarks_note LIKE :q)";
-    $params[':q'] = '%' . $search . '%';
-}
-if ($filterGrade > 0) {
-    $sqlWhere .= " AND h.quality_grade_id = :grade";
-    $params[':grade'] = $filterGrade;
-}
-if ($filterRemark > 0) {
-    $sqlWhere .= " AND h.remark_id = :remark";
-    $params[':remark'] = $filterRemark;
-}
-
-$countSql = "
-    SELECT COUNT(*) as total
-    FROM harvest h
-    JOIN planting p ON p.planting_id = h.planting_id
-    JOIN farm f ON f.farm_id = p.farm_id
-    JOIN farmer fm ON fm.farmer_id = f.farmer_id
-    JOIN crop c ON c.crop_id = p.crop_id
-    WHERE {$sqlWhere}
-";
-$totalRows = (int)(Database::rawQuery($countSql, $params)[0]['total'] ?? 0);
-$totalPages = max(1, (int)ceil($totalRows / $perPage));
-
-$selectSql = "
-    SELECT h.*, (h.quantity_kg * h.selling_price_per_kg) as total_value,
-           p.planting_date,
-           f.farm_name, f.location as farm_location,
-           fm.first_name, fm.last_name,
-           c.crop_name, c.variety,
-           qg.grade_name,
-           hr.remark_description
-    FROM harvest h
-    JOIN planting p ON p.planting_id = h.planting_id
-    JOIN farm f ON f.farm_id = p.farm_id
-    JOIN farmer fm ON fm.farmer_id = f.farmer_id
-    JOIN crop c ON c.crop_id = p.crop_id
-    JOIN harvest_quality_grades qg ON qg.quality_grade_id = h.quality_grade_id
-    JOIN harvest_remarks hr ON hr.remark_id = h.remark_id
-    WHERE {$sqlWhere}
-    ORDER BY h.harvest_id ASC
-    LIMIT {$perPage} OFFSET {$offset}
-";
-$harvestsList = Database::rawQuery($selectSql, $params);
+$totalRows    = $harvestModel->countFiltered($search, $filterGrade, $filterRemark);
+$totalPages   = max(1, (int)ceil($totalRows / $perPage));
+$harvestsList = $harvestModel->getAll($search, $filterGrade, $filterRemark, $perPage, $offset);
 
 // Check if prefill requested from planting cycle
 $prefillPlantingId = (int)($_GET['planting_id'] ?? 0);

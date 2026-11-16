@@ -4,6 +4,8 @@ $pageTitle = 'Crops Master Catalog';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$cropModel = new Crop();
+
 // Handle POST actions: Save (Create/Update), Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -44,12 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($id > 0) {
-            Database::update('crop', 'crop_id', $id, $data);
+            $cropModel->update($id, $data);
             log_activity('UPDATE', 'CROP', "Updated crop '{$cropName}' (#{$id}).", $id, $data);
             flash('success', "Crop '{$cropName}' updated successfully.");
         } else {
-            $res = Database::insert('crop', $data);
-            $newId = (int)($res['id'] ?? $res['crop_id'] ?? 0);
+            $newId = $cropModel->create($data);
             log_activity('CREATE', 'CROP', "Added new crop '{$cropName}' (" . ($variety ?: 'Standard') . ") to master catalog.", $newId, $data);
             flash('success', "Crop '{$cropName}' added to master catalog.");
         }
@@ -68,66 +69,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('crops.php');
         }
 
-        // Referential integrity check: check if crop has plantings
-        $linkedPlantings = Database::rawQuery("SELECT COUNT(*) as cnt FROM planting WHERE crop_id = :id", [':id' => $id]);
-        $plantingCount = (int)($linkedPlantings[0]['cnt'] ?? 0);
-        if ($plantingCount > 0) {
-            flash('error', "Cannot delete this crop: it is currently used in {$plantingCount} planting record(s). Delete or reassign the planting records first.");
+        $cRow = $cropModel->getById($id) ?? [];
+        $cName = $cRow['crop_name'] ?? "Crop #{$id}";
+
+        $delResult = $cropModel->deleteCrop($id);
+        if (!$delResult['success']) {
+            flash('error', $delResult['message']);
             redirect('crops.php');
         }
 
-        $cRow = Database::query('crop', 'crop_name, variety', ['crop_id' => $id])[0] ?? [];
-        $cName = $cRow['crop_name'] ?? "Crop #{$id}";
-
-        Database::delete('crop', 'crop_id', $id);
         log_activity('DELETE', 'CROP', "Deleted crop '{$cName}' (#{$id}) from master catalog.", $id);
-        flash('success', 'Crop record deleted successfully.');
+        flash('success', $delResult['message']);
         redirect('crops.php');
     }
 }
 
-// Fetch Lookups
-$allCategories = Database::query('crop_categories', 'category_id, category_name', [], 'category_id.asc');
-$allSeasons = Database::query('recommended_seasons', 'season_id, season_name', [], 'season_id.asc');
+// Fetch Lookups via Crop Model
+$allCategories  = $cropModel->getCategories();
+$allSeasons     = $cropModel->getSeasons();
 
-// Filters & Search & Pagination
-$search = trim((string)($_GET['q'] ?? ''));
+// Filters & Search & Pagination via Crop Model
+$search         = trim((string)($_GET['q'] ?? ''));
 $filterCategory = (int)($_GET['cat'] ?? 0);
-$filterSeason = (int)($_GET['season'] ?? 0);
-$pageNo = max(1, (int)($_GET['p'] ?? 1));
-$perPage = 10;
-$offset = ($pageNo - 1) * $perPage;
+$filterSeason   = (int)($_GET['season'] ?? 0);
+$pageNo         = max(1, (int)($_GET['p'] ?? 1));
+$perPage        = 10;
+$offset         = ($pageNo - 1) * $perPage;
 
-$sqlWhere = "1=1";
-$params = [];
-if ($search !== '') {
-    $sqlWhere .= " AND (c.crop_name LIKE :q OR c.variety LIKE :q)";
-    $params[':q'] = '%' . $search . '%';
-}
-if ($filterCategory > 0) {
-    $sqlWhere .= " AND c.category_id = :cat";
-    $params[':cat'] = $filterCategory;
-}
-if ($filterSeason > 0) {
-    $sqlWhere .= " AND c.season_id = :season";
-    $params[':season'] = $filterSeason;
-}
-
-$countSql = "SELECT COUNT(*) as total FROM crop c WHERE {$sqlWhere}";
-$totalRows = (int)(Database::rawQuery($countSql, $params)[0]['total'] ?? 0);
-$totalPages = max(1, (int)ceil($totalRows / $perPage));
-
-$selectSql = "
-    SELECT c.*, cc.category_name, rs.season_name,
-           (SELECT COUNT(*) FROM planting p WHERE p.crop_id = c.crop_id) as planting_count
-    FROM crop c
-    JOIN crop_categories cc ON cc.category_id = c.category_id
-    JOIN recommended_seasons rs ON rs.season_id = c.season_id
-    WHERE {$sqlWhere}
-    ORDER BY c.crop_id ASC
-    LIMIT {$perPage} OFFSET {$offset}
-";
-$cropsList = Database::rawQuery($selectSql, $params);
+$totalRows      = $cropModel->countFiltered($search, $filterCategory, $filterSeason);
+$totalPages     = max(1, (int)ceil($totalRows / $perPage));
+$cropsList      = $cropModel->getAll($search, $filterCategory, $filterSeason, $perPage, $offset);
 
 require_once __DIR__ . '/includes/header.php';
 ?>

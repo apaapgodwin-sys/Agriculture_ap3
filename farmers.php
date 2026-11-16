@@ -4,6 +4,8 @@ $pageTitle = 'Farmers Management';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$farmerModel = new Farmer();
+
 // Handle POST actions: Save (Create/Update), Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -39,12 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($id > 0) {
-            Database::update('farmer', 'farmer_id', $id, $data);
+            $farmerModel->update($id, $data);
             log_activity('UPDATE', 'FARMER', "Updated details for farmer '{$firstName} {$lastName}' (#{$id}).", $id, $data);
             flash('success', "Farmer {$firstName} {$lastName} updated successfully.");
         } else {
-            $res = Database::insert('farmer', $data);
-            $newId = (int)($res['id'] ?? $res['farmer_id'] ?? 0);
+            $newId = $farmerModel->create($data);
             log_activity('CREATE', 'FARMER', "Registered new farmer '{$firstName} {$lastName}' in {$address}.", $newId, $data);
             flash('success', "Farmer {$firstName} {$lastName} registered successfully.");
         }
@@ -63,70 +64,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('farmers.php');
         }
 
-        // Referential integrity check: check if farmer has farms
-        $linkedFarms = Database::rawQuery("SELECT COUNT(*) as cnt FROM farm WHERE farmer_id = :id", [':id' => $id]);
-        $farmCount = (int)($linkedFarms[0]['cnt'] ?? 0);
-        if ($farmCount > 0) {
-            flash('error', "Cannot delete this farmer: this farmer owns {$farmCount} registered farm(s). You must reassign or remove the farms first.");
+        $fRow = $farmerModel->getById($id) ?? [];
+        $fName = trim(($fRow['first_name'] ?? '') . ' ' . ($fRow['last_name'] ?? ''));
+
+        $delResult = $farmerModel->deleteFarmer($id);
+        if (!$delResult['success']) {
+            flash('error', $delResult['message']);
             redirect('farmers.php');
         }
 
-        $fRow = Database::query('farmer', 'first_name, last_name', ['farmer_id' => $id])[0] ?? [];
-        $fName = trim(($fRow['first_name'] ?? '') . ' ' . ($fRow['last_name'] ?? ''));
-
-        Database::delete('farmer', 'farmer_id', $id);
         log_activity('DELETE', 'FARMER', "Deleted farmer record #{$id}" . ($fName ? " ('{$fName}')" : '') . ".", $id);
-        flash('success', 'Farmer record deleted successfully.');
+        flash('success', $delResult['message']);
         redirect('farmers.php');
     }
 }
 
-// Search & Filter & Pagination
+// Search & Filter & Pagination via Farmer Model
 $search = trim((string)($_GET['q'] ?? ''));
 $sort = (string)($_GET['sort'] ?? 'id_asc');
 $pageNo = max(1, (int)($_GET['p'] ?? 1));
 $perPage = 10;
 $offset = ($pageNo - 1) * $perPage;
 
-$orderClause = match ($sort) {
-    'name_asc' => 'f.last_name ASC, f.first_name ASC',
-    'name_desc' => 'f.last_name DESC, f.first_name DESC',
-    'date_desc' => 'f.date_registered DESC',
-    'date_asc' => 'f.date_registered ASC',
-    'id_desc' => 'f.farmer_id DESC',
-    default => 'f.farmer_id ASC'
-};
-
-$sqlWhere = "1=1";
-$params = [];
-if ($search !== '') {
-    $sqlWhere .= " AND (f.first_name LIKE :q OR f.last_name LIKE :q OR f.address LIKE :q OR f.contact_number LIKE :q)";
-    $params[':q'] = '%' . $search . '%';
-}
-
-$countSql = "SELECT COUNT(*) as total FROM farmer f WHERE {$sqlWhere}";
-$totalRows = (int)(Database::rawQuery($countSql, $params)[0]['total'] ?? 0);
+$totalRows = $farmerModel->countFiltered($search);
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
-
-$selectSql = "
-    SELECT f.*, COUNT(fm.farm_id) as farm_count
-    FROM farmer f
-    LEFT JOIN farm fm ON fm.farmer_id = f.farmer_id
-    WHERE {$sqlWhere}
-    GROUP BY f.farmer_id
-    ORDER BY {$orderClause}
-    LIMIT {$perPage} OFFSET {$offset}
-";
-$farmersList = Database::rawQuery($selectSql, $params);
+$farmersList = $farmerModel->getAll($search, $sort, $perPage, $offset);
 
 // Check if an edit record is requested
 $editRecord = null;
 if (isset($_GET['edit'])) {
     $editId = (int)$_GET['edit'];
-    $res = Database::rawQuery("SELECT * FROM farmer WHERE farmer_id = :id", [':id' => $editId]);
-    if (!empty($res)) {
-        $editRecord = $res[0];
-    }
+    $editRecord = $farmerModel->getById($editId);
 }
 
 // Check if a view record is requested
@@ -134,17 +102,9 @@ $viewRecord = null;
 $viewFarms = [];
 if (isset($_GET['view'])) {
     $viewId = (int)$_GET['view'];
-    $res = Database::rawQuery("SELECT * FROM farmer WHERE farmer_id = :id", [':id' => $viewId]);
-    if (!empty($res)) {
-        $viewRecord = $res[0];
-        $viewFarms = Database::rawQuery("
-            SELECT fm.*, st.soil_type_name, it.irrigation_type_name
-            FROM farm fm
-            LEFT JOIN soil_types st ON st.soil_type_id = fm.soil_type_id
-            LEFT JOIN irrigation_types it ON it.irrigation_type_id = fm.irrigation_type_id
-            WHERE fm.farmer_id = :id
-            ORDER BY fm.farm_id ASC
-        ", [':id' => $viewId]);
+    $viewRecord = $farmerModel->getById($viewId);
+    if ($viewRecord) {
+        $viewFarms = $farmerModel->getFarms($viewId);
     }
 }
 

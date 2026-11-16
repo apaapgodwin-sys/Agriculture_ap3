@@ -4,6 +4,8 @@ $pageTitle = 'Activity & Audit Logs';
 require_once __DIR__ . '/config/config.php';
 require_login();
 
+$logModel = new ActivityLog();
+
 // Handle Clear Logs (Admin only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -16,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $adminUser = current_user();
-        Database::rawQuery("DELETE FROM activity_logs");
+        $logModel->clearAll();
         log_activity('SECURITY', 'AUTH', "Audit logs were purged by Administrator '{$adminUser['username']}'.");
         flash('success', 'Activity and audit logs have been successfully cleared.');
         redirect('logs.php');

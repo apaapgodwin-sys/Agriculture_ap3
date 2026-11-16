@@ -38,20 +38,10 @@ function attempt_login(string $identifier, string $password): bool {
         return false;
     }
 
-    // Check users table in DB (Supabase or Local)
-    $users = Database::query('users', '*', [
-        'username' => $identifier
-    ]);
+    $userModel = new User();
+    $user = $userModel->getByUsername($identifier) ?? $userModel->getByEmail($identifier);
 
-    if (empty($users)) {
-        // Also check by email
-        $users = Database::query('users', '*', [
-            'email' => $identifier
-        ]);
-    }
-
-    if (!empty($users)) {
-        $user = $users[0];
+    if ($user) {
         if (password_verify($password, $user['password_hash'])) {
             if (($user['status'] ?? 'active') !== 'active') {
                 log_activity('FAILED_LOGIN', 'AUTH', "Attempted sign-in to deactivated account '{$user['username']}'.", (int)$user['user_id']);

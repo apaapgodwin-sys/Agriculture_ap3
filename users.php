@@ -4,6 +4,8 @@ $pageTitle = 'User Management';
 require_once __DIR__ . '/config/config.php';
 require_admin();
 
+$userModel = new User();
+
 // Handle POST actions: Save (Create/Update), Delete
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -55,9 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     flash('error', 'Password must be at least 6 characters long.');
                     redirect('users.php');
                 }
-                $data['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
+                $data['password'] = $password;
             }
-            Database::update('users', 'user_id', $id, $data);
+            $userModel->update($id, $data);
             log_activity('UPDATE', 'USER', "Updated user account '{$username}' (#{$id}, Role: " . strtoupper($role) . ", Status: " . ucfirst($status) . ").", $id);
             flash('success', "User '{$username}' updated successfully.");
         } else {
@@ -65,9 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'Password is required and must be at least 6 characters long.');
                 redirect('users.php');
             }
-            $data['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
-            $res = Database::insert('users', $data);
-            $newId = (int)($res['id'] ?? $res['user_id'] ?? 0);
+            $data['password'] = $password;
+            $newId = $userModel->create($data);
             log_activity('CREATE', 'USER', "Created new user account '{$username}' ({$fullName}, Role: " . strtoupper($role) . ").", $newId);
             flash('success', "User '{$username}' created successfully.");
         }
@@ -87,18 +88,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('users.php');
         }
 
-        $uRow = Database::query('users', 'username, full_name', ['user_id' => $id])[0] ?? [];
+        $uRow = $userModel->getById($id) ?? [];
         $uName = $uRow['username'] ?? "User #{$id}";
 
-        Database::delete('users', 'user_id', $id);
+        $userModel->deleteUser($id);
         log_activity('DELETE', 'USER', "Deleted user account '{$uName}' (#{$id}).", $id);
         flash('success', 'User account deleted successfully.');
         redirect('users.php');
     }
 }
 
-// Fetch all users
-$usersList = Database::rawQuery("SELECT * FROM users ORDER BY user_id ASC");
+// Fetch all users via User Model
+$usersList = $userModel->getAll();
 
 require_once __DIR__ . '/includes/header.php';
 ?>

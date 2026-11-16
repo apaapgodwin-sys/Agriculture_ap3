@@ -3,26 +3,25 @@ declare(strict_types=1);
 $pageTitle = 'Dashboard';
 require_once __DIR__ . '/includes/header.php';
 
-// Fetch dynamic counts & statistics
-$farmers = Database::query('farmer', 'farmer_id');
-$crops = Database::query('crop', 'crop_id');
+// Instantiate OOP Model classes (AP3 Architecture)
+$farmerModel   = new Farmer();
+$farmModel     = new Farm();
+$cropModel     = new Crop();
+$plantingModel = new Planting();
+$harvestModel  = new Harvest();
+$logModel      = new ActivityLog();
+
+$totalFarmers  = $farmerModel->count();
+$totalFarms    = $farmModel->countActive();
+$totalCrops    = $cropModel->count();
+$totalPlantings= $plantingModel->count();
+
+$harvestTotals       = $harvestModel->getTotals();
+$totalHarvests       = $harvestTotals['count'];
+$totalHarvestedKg    = $harvestTotals['total_kg'];
+$totalEstimatedValue = $harvestTotals['total_valuation'];
+
 $plantings = Database::query('planting', 'planting_id, status_id');
-$harvests = Database::query('harvest', 'harvest_id, quantity_kg, selling_price_per_kg');
-
-$totalFarmers = count($farmers);
-$totalFarms = (int)(Database::rawQuery("SELECT COUNT(*) as c FROM farm WHERE deleted_at IS NULL")[0]['c'] ?? 0);
-$totalCrops = count($crops);
-$totalPlantings = count($plantings);
-$totalHarvests = count($harvests);
-
-$totalHarvestedKg = 0.0;
-$totalEstimatedValue = 0.0;
-foreach ($harvests as $h) {
-    $qty = (float)($h['quantity_kg'] ?? 0);
-    $price = (float)($h['selling_price_per_kg'] ?? 0);
-    $totalHarvestedKg += $qty;
-    $totalEstimatedValue += ($qty * $price);
-}
 
 // Plantings by Status breakdown for chart
 $statusList = Database::query('planting_statuses', 'status_id, status_name');
@@ -65,8 +64,8 @@ $recentHarvests = Database::rawQuery("
     LIMIT 6
 ");
 
-// Recent System Activity Logs
-$recentLogs = Database::rawQuery("SELECT * FROM activity_logs ORDER BY log_id DESC LIMIT 6");
+// Recent System Activity Logs via ActivityLog model
+$recentLogs = $logModel->getRecent(6);
 
 // Harvest production by Crop for Bar Chart
 $cropHarvestData = Database::rawQuery("
